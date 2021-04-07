@@ -100,12 +100,7 @@ class AuthController implements ControllerInterface {
           async (err, token) => {
             if (err) throw err;
             const reqUser = await get(reqBody.username);
-            res.status(200)
-              .json({
-                expiresIn,
-                token,
-                reqUser,
-              });
+            response(res, true, { expiresIn, token, reqUser }, '');
           },
         );
       } else {

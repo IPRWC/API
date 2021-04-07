@@ -45,7 +45,7 @@ class OrderController implements ControllerInterface {
   };
 
   getOrdersForUser = async (req: Request, res: Response) => {
-    // if the user isn't an admin or the requested user doesn't equal the current user
+    // if the user isn't an admin and the requested user doesn't equal the current user
     if (!req.user.admin && req.user.username !== req.params.username) {
       // return unauthorized message
       return response(res, false, null, 'Not authorized', 403);
@@ -74,7 +74,7 @@ class OrderController implements ControllerInterface {
 
   getOrder = async (req: Request, res: Response) => {
     try {
-      // if the user isn't an admin or the requested user doesn't equal the current user
+      // if the user isn't an admin and the requested user doesn't equal the current user
       if (!req.user.admin && req.user.username !== req.params.username) {
         // return unauthorized message
         return response(res, false, null, 'Not authorized', 403);
@@ -102,7 +102,7 @@ class OrderController implements ControllerInterface {
 
   createOrder = async (req: Request, res: Response) => {
     try {
-      // if the user isn't an admin or the requested user doesn't equal the current user
+      // if the user isn't an admin and the requested user doesn't equal the current user
       if (!req.user.admin && req.user.username !== req.params.username) {
         // return unauthorized message
         return response(res, false, null, 'Not authorized', 403);

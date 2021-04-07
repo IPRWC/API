@@ -3,6 +3,7 @@ import { validateOrReject } from 'class-validator';
 import { plainToClass } from 'class-transformer';
 import User from '../models/user/user.model';
 import app from '../index';
+import Cart from '../models/cart/cart.model';
 
 export async function getAll(): Promise<User[]> {
   return app.db.getRepository(User)
@@ -35,6 +36,9 @@ export async function create(body: any): Promise<void> {
   const user = plainToClass(User, body);
   user.password = await argon2.hash(user.password);
   await validateOrReject(user);
+  const cart = new Cart();
+  await app.db.manager.save(cart);
+  user.cart = cart;
   await app.db.getRepository(User)
     .save(user);
 }
