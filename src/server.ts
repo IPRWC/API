@@ -14,9 +14,9 @@ class Server {
 
   public port: number;
 
-  public limiterSlowBruteByIP!: RateLimiterMySQL;
+  public IPLimiter!: RateLimiterMySQL;
 
-  public limiterConsecutiveFailsByUsernameAndIP!: RateLimiterMySQL;
+  public FailsByUsernameAndIP!: RateLimiterMySQL;
 
   constructor(appInit: { port: number; middleWares: any; controllers: any; }) {
     this.app = express();
@@ -34,20 +34,20 @@ class Server {
 
     const { pool } = this.db.driver as MysqlDriver;
 
-    this.limiterSlowBruteByIP = new RateLimiterMySQL({
+    this.IPLimiter = new RateLimiterMySQL({
       storeClient: pool,
       keyPrefix: 'login_fail_ip_per_day',
       points: maxWrongAttemptsByIPPerDay,
-      duration: 60 * 60 * 24,
-      blockDuration: 60 * 60 * 24, // Block for 1 day, if 100 wrong attempts per day
+      duration: 60 * 60,
+      blockDuration: 60 * 60,
     });
 
-    this.limiterConsecutiveFailsByUsernameAndIP = new RateLimiterMySQL({
+    this.FailsByUsernameAndIP = new RateLimiterMySQL({
       storeClient: pool,
       keyPrefix: 'login_fail_consecutive_username_and_ip',
       points: maxConsecutiveFailsByUsernameAndIP,
-      duration: 60 * 60 * 24 * 90, // Store number for 90 days since first fail
-      blockDuration: 60 * 60, // Block for 1 hour
+      duration: 60 * 60 * 24 * 30,
+      blockDuration: 60 * 60,
     });
   }
 

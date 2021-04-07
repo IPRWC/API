@@ -4,8 +4,10 @@ import helmet from 'helmet';
 import Server from './server';
 import UserController from './controllers/user.controller';
 import 'reflect-metadata';
-import User from './models/user.model';
+import User from './models/user/user.model';
 import AuthController from './controllers/auth.controller';
+import ProductController from './controllers/product.controller';
+import OrderController from './controllers/order.controller';
 
 declare global {
   namespace Express {
@@ -20,6 +22,8 @@ const app = new Server({
   controllers: [
     new UserController(),
     new AuthController(),
+    new ProductController(),
+    new OrderController(),
   ],
   middleWares: [
     bodyParser.json(),

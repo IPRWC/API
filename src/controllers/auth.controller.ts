@@ -6,7 +6,7 @@ import { SignOptions } from 'jsonwebtoken';
 import ControllerInterface from '../interfaces/controller.interface';
 
 import {
-  getLoginUser, getUser,
+  login, get,
 } from '../crud/user.crud';
 import {
   expiresIn, maxConsecutiveFailsByUsernameAndIP, maxWrongAttemptsByIPPerDay, secret,
@@ -14,6 +14,7 @@ import {
 import JwtPayloadInterface from '../interfaces/jwt-payload.interface';
 import { authMiddleware } from '../middleware/auth.middleware';
 import app from '../index';
+import response from '../structures/response.structures';
 
 class AuthController implements ControllerInterface {
   public router = express.Router();
@@ -27,44 +28,69 @@ class AuthController implements ControllerInterface {
     this.router.post('/auth/login', this.login);
   }
 
-  getMe = async (req: Request, res: Response) => res.status(200).json(req.user);
+  // return the current user for a logged in check
+  getMe = async (req: Request, res: Response) => response(res, true, req.user, '');
 
   // eslint-disable-next-line consistent-return
   login = async (req: Request, res: Response) => {
-    const userBody = req.body;
-    if (typeof userBody.username !== 'string'
-        || typeof userBody.password !== 'string') return res.status(400).json('Please specify a username and password');
+    // get the request body
+    const reqBody = req.body;
 
+    // if the password and username aren't strings
+    if (typeof reqBody.username !== 'string' || typeof reqBody.password !== 'string') {
+      // return error message
+      return response(res, false, null, 'Please specify a username and password', 400);
+    }
+
+    // get the ip address from the api
     const ipAddr = req.ip;
+
+    // combine the user name and the api
     const usernameIPkey = `${req.body.username}_${ipAddr}`;
+
+    // rate limiter
     const [resUsernameAndIP, resSlowByIP] = await Promise.all([
-      app.limiterConsecutiveFailsByUsernameAndIP.get(usernameIPkey),
-      app.limiterSlowBruteByIP.get(ipAddr),
+      app.FailsByUsernameAndIP.get(usernameIPkey),
+      app.IPLimiter.get(ipAddr),
     ]);
 
     let retrySecs = 0;
 
-    // Check if IP or Username + IP is already blocked
+    // If the ip is blocked
     if (resSlowByIP !== null && resSlowByIP.consumedPoints > maxWrongAttemptsByIPPerDay) {
+      // set a timeout before the next request
       retrySecs = Math.round(resSlowByIP.msBeforeNext / 1000) || 1;
     } else if (resUsernameAndIP !== null
-        && resUsernameAndIP.consumedPoints > maxConsecutiveFailsByUsernameAndIP) {
+            && resUsernameAndIP.consumedPoints > maxConsecutiveFailsByUsernameAndIP) {
+      // set a timeout before the next request
       retrySecs = Math.round(resUsernameAndIP.msBeforeNext / 1000) || 1;
     }
+
+    // if there's a time-out for the user
     if (retrySecs > 0) {
+      // set a Retry-After header for the response
       res.set('Retry-After', String(retrySecs));
-      res.status(429).send('Too Many Requests');
+
+      // return a error message
+      res.status(429)
+        .send('Too Many Requests');
     } else {
-      const userInDB = await getLoginUser(userBody.username);
-      if (userInDB && await argon2.verify(userInDB.password, userBody.password)) {
+      // get the user from the database
+      const user = await login(reqBody.username);
+
+      // if there's an user and the password is valid
+      if (user && await argon2.verify(user.password, reqBody.password)) {
+        // if the user has failed attempts
         if (resUsernameAndIP !== null && resUsernameAndIP.consumedPoints > 0) {
-          // Reset on successful authorisation
-          await app.limiterConsecutiveFailsByUsernameAndIP.delete(usernameIPkey);
+          // delete the attempts
+          await app.FailsByUsernameAndIP.delete(usernameIPkey);
         }
+        // create the jwt
         const payload: JwtPayloadInterface = {
-          userId: userInDB.id,
+          userId: user.id,
         };
 
+        // sign the jwt
         jwt.sign(
           payload,
           secret,
@@ -73,31 +99,42 @@ class AuthController implements ControllerInterface {
           } as SignOptions,
           async (err, token) => {
             if (err) throw err;
-            const user = await getUser(userBody.username);
-            res.status(200).json({
-              expiresIn,
-              token,
-              user,
-            });
+            const reqUser = await get(reqBody.username);
+            res.status(200)
+              .json({
+                expiresIn,
+                token,
+                reqUser,
+              });
           },
         );
       } else {
-        // Consume 1 point from limiters on wrong attempt and block if limits reached
+        // Add one point and block if limit is reached
         try {
-          const promises = [app.limiterSlowBruteByIP.consume(ipAddr)];
-          if (userInDB) {
-            // Count failed attempts by Username + IP only for registered users
-            promises.push(app.limiterConsecutiveFailsByUsernameAndIP.consume(usernameIPkey));
+          // get the promisses
+          const promises = [app.IPLimiter.consume(ipAddr)];
+          // if there's a user in the db
+          if (user) {
+            // Count failed attempts
+            promises.push(app.FailsByUsernameAndIP.consume(usernameIPkey));
           }
           await Promise.all(promises);
 
-          res.status(400).end('email or password is wrong');
+          // return invalid password
+          res.status(400)
+            .end('Invalid email or password');
         } catch (rlRejected) {
+          // if there's an error
           if (rlRejected instanceof Error) {
+            // throw the error
             throw rlRejected;
           } else {
+            // return the 'Retry-After' header with the time out
             res.set('Retry-After', String(Math.round(rlRejected.msBeforeNext / 1000) || 1));
-            res.status(429).send('Too Many Requests');
+
+            // return error message
+            res.status(429)
+              .send('Too Many Requests');
           }
         }
       }

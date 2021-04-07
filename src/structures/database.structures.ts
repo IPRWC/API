@@ -14,7 +14,7 @@ connectionManager.create({
   password: dbPassword,
   port: dbPort,
   host: dbHost,
-  entities: [join(__dirname, '..', 'models/*{.js,.ts}')],
+  entities: [join(__dirname, '..', 'models/*/*{.js,.ts}')],
 });
 
 export default connectionManager;

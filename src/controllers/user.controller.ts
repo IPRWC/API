@@ -3,8 +3,9 @@ import { Request, Response } from 'express';
 import ControllerBase from '../interfaces/controller.interface';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.middleware';
 import {
-  createUser, getAllUsers, getUser, deleteUser,
+  create, getAll, get, remove,
 } from '../crud/user.crud';
+import response from '../structures/response.structures';
 
 class UserController implements ControllerBase {
   public router = express.Router();
@@ -14,56 +15,90 @@ class UserController implements ControllerBase {
   }
 
   public initRoutes() {
-    this.router.get('/users', authMiddleware, this.getAllUsers);
-    this.router.get('/users/:username', authMiddleware, this.getUser);
-    this.router.post('/users', optionalAuthMiddleware, this.createUser);
-    this.router.delete('/users/:username', authMiddleware, this.deleteUser);
+    this.router.get('/users', authMiddleware, this.getAll);
+    this.router.get('/users/:username', authMiddleware, this.get);
+    this.router.post('/users', optionalAuthMiddleware, this.create);
+    this.router.delete('/users/:username', authMiddleware, this.delete);
   }
 
-  getAllUsers = async (req: Request, res: Response) => {
-    if (!req.user.admin) return res.status(403).json('Not authorized');
-
-    const users = await getAllUsers();
-    if (users.length === 0) {
-      return res.status(404).json('Could not find users');
+  getAll = async (req: Request, res: Response) => {
+    // if the user isn't an admin
+    if (!req.user.admin) {
+      // return the unauthorized message
+      return response(res, false, null, 'Not authorized', 403);
     }
-    return res.status(200).json(users);
+
+    // get all the user from the database
+    const users = await getAll();
+
+    // if there aren't any users
+    if (users.length < 1) {
+      // return error message
+      return response(res, false, null, 'No users found', 404);
+    }
+
+    // return all the users
+    return response(res, true, users, '');
   };
 
-  getUser = async (req: Request, res: Response) => {
+  get = async (req: Request, res: Response) => {
     try {
-      const user = await getUser(req.params.username);
-      console.log(req.user);
-      if (!req.user.admin && req.user.username !== req.params.username) return res.status(403).json('Not authorized');
-      return res.json(user);
-    } catch (error) {
-      return res.status(404).json(error.toString());
-    }
-  };
+      // get the user from the database
+      const user = await get(req.params.username);
 
-  createUser = async (req: Request, res: Response) => {
-    try {
-      if (!req.user?.admin) {
-        if (req.body.admin) return res.status(400).json('Not authorized to create admin user');
-        req.body.admin = false;
-        await createUser(req.body);
-        return res.json('Successfully created user');
+      // if the user isn't an admin and the current user doesn't equal the requested user
+      if (!req.user.admin && req.user.username !== req.params.username) {
+        // return the unauthorized message
+        return response(res, false, null, 'Not authorized', 403);
       }
-      await createUser(req.body);
-      return res.json('Successfully created user');
+
+      // return the user
+      return response(res, true, user, '');
     } catch (error) {
-      return res.status(400).json(error.toString());
+      // if there's an error return the error
+      return response(res, false, null, error.toString(), 400);
     }
   };
 
-  deleteUser = async (req: Request, res: Response) => {
+  create = async (req: Request, res: Response) => {
     try {
-      if (!req.user.admin && req.user.username !== req.params.username) return res.status(403).json('Not authorized');
-      await deleteUser(req.params.username);
-      return res.json('Successfully deleted user');
+      // if the requesting user isn't an admin
+      if (!req.user?.admin) {
+        // if the user wan't to create an admin
+        if (req.body.admin) {
+          // return unauthorized message
+          return response(res, false, null, 'Not authorized', 400);
+        }
+        // set the admin to false
+        req.body.admin = false;
+      }
+
+      // create the user
+      await create(req.body);
+
+      // return a success message
+      return response(res, true, null, 'User created', 201);
     } catch (error) {
-      return res.status(400)
-        .json(error.toString());
+      // return error message
+      return response(res, false, null, error.toString(), 400);
+    }
+  };
+
+  delete = async (req: Request, res: Response) => {
+    try {
+      // if the user isn't an admin and doesn't equal the requesting user
+      if (!req.user.admin && req.user.username !== req.params.username) {
+        return response(res, false, null, 'Not authorized', 402);
+      }
+
+      // remove the user
+      await remove(req.params.username);
+
+      // return success message
+      return response(res, true, null, 'User deleted', 410);
+    } catch (error) {
+      // return error message
+      return response(res, false, null, error.toString(), 400);
     }
   };
 }

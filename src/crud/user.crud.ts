@@ -1,25 +1,25 @@
+import * as argon2 from 'argon2';
 import { validateOrReject } from 'class-validator';
 import { plainToClass } from 'class-transformer';
-import * as argon2 from 'argon2';
+import User from '../models/user/user.model';
 import app from '../index';
-import User from '../models/user.model';
 
-export async function getAllUsers(): Promise<User[]> {
+export async function getAll(): Promise<User[]> {
   return app.db.getRepository(User)
     .createQueryBuilder('user')
     .select(['user.username', 'user.admin', 'user.email'])
     .getMany();
 }
 
-export async function getUser(username: string): Promise<User> {
+export async function get(username: string): Promise<User> {
   return app.db.getRepository(User)
     .createQueryBuilder('user')
-    .select(['user.username', 'user.admin', 'user.email'])
+    .select(['user.id', 'user.username', 'user.admin', 'user.email'])
     .where('user.username = :username', { username })
     .getOneOrFail();
 }
 
-export async function getUserById(id: string): Promise<User> {
+export async function getById(id: string): Promise<User> {
   return app.db.getRepository(User)
     .createQueryBuilder('user')
     .select(['user.username', 'user.admin', 'user.email'])
@@ -27,7 +27,7 @@ export async function getUserById(id: string): Promise<User> {
     .getOneOrFail();
 }
 
-export async function createUser(body: any): Promise<void> {
+export async function create(body: any): Promise<void> {
   const newBody = body;
   if (newBody.id) delete newBody.id;
   if (newBody.orders) delete newBody.orders;
@@ -39,7 +39,7 @@ export async function createUser(body: any): Promise<void> {
     .save(user);
 }
 
-export async function getLoginUser(username: string): Promise<User | undefined> {
+export async function login(username: string): Promise<User | undefined> {
   return app.db.getRepository(User)
     .createQueryBuilder('user')
     .select(['user.id', 'user.password'])
@@ -47,7 +47,7 @@ export async function getLoginUser(username: string): Promise<User | undefined> 
     .getOne();
 }
 
-export async function deleteUser(username: string): Promise<void> {
+export async function remove(username: string): Promise<void> {
   const user = await app.db.getRepository(User)
     .createQueryBuilder('user')
     .where('user.username = :username', { username })
