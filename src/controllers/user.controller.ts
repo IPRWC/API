@@ -95,7 +95,7 @@ class UserController implements ControllerBase {
       await remove(req.params.username);
 
       // return success message
-      return response(res, true, null, 'User deleted', 410);
+      return response(res, true, null, 'User deleted', 200);
     } catch (error) {
       // return error message
       return response(res, false, null, error.toString(), 400);

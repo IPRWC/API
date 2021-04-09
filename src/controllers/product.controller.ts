@@ -80,7 +80,7 @@ class ProductController implements ControllerBase {
       await remove(req.params.id);
 
       // return success message
-      return response(res, true, null, 'Product deleted', 410);
+      return response(res, true, null, 'Product deleted', 200);
     } catch (error) {
       // return the error message
       return response(res, false, null, error.toString(), 400);
